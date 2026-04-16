@@ -1,0 +1,1 @@
+/home/popes/kronos-riscv/sim/run_arch_test_s2.sh
