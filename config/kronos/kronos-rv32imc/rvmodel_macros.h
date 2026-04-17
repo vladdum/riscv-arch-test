@@ -6,7 +6,6 @@
 #define RVMODEL_DATA_SECTION
 
 #define RVMODEL_BOOT
-
 #define RVMODEL_HALT_PASS             \
   li t0, 0x40000000               ;  \
   sw x0, 0(t0)                    ;  \
@@ -50,5 +49,15 @@
 #define RVMODEL_CLR_SEXT_INT(_R1, _R2)
 #define RVMODEL_SET_SSW_INT(_R1, _R2)
 #define RVMODEL_CLR_SSW_INT(_R1, _R2)
+
+/* Override LA to avoid 0x0000 rvc alignment padding at rvmodel_boot */
+#undef LA
+#define LA(reg, val)              \
+  .ifnc(reg, X0)                 ;\
+    .option push                 ;\
+    .option norvc                ;\
+    la reg, val                  ;\
+    .option pop                  ;\
+  .endif
 
 #endif /* _RVMODEL_MACROS_H */
