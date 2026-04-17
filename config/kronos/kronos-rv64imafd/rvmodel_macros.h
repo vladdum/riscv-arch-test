@@ -5,8 +5,25 @@
 
 #define RVMODEL_DATA_SECTION
 
-#define RVMODEL_BOOT
-
+/* Install a trap handler that skips illegal instructions (mepc += 4, mret).
+ * This is required because ACT4 tests use .align directives that fill padding
+ * with zeros (decoded as illegal instructions). Reference simulators (Spike,
+ * Sail) have a built-in skip handler; we must provide one in RVMODEL_BOOT.
+ * Use .option arch +zicsr so CSR instructions assemble even with -march=rv64i. */
+#define RVMODEL_BOOT                                                         \
+  .option push                                                              ;\
+  .option norvc                                                             ;\
+  .option arch, +zicsr                                                      ;\
+  la      t0, _kronos_trap_handler                                          ;\
+  csrw    mtvec, t0                                                         ;\
+  j       _kronos_boot_done                                                 ;\
+_kronos_trap_handler:                                                        \
+  csrr    t0, mepc                                                          ;\
+  addi    t0, t0, 4                                                         ;\
+  csrw    mepc, t0                                                          ;\
+  mret                                                                      ;\
+_kronos_boot_done:                                                           \
+  .option pop                                                               ;
 #define RVMODEL_HALT_PASS             \
   li t0, 0x40000000               ;  \
   sw x0, 0(t0)                    ;  \
@@ -50,5 +67,15 @@
 #define RVMODEL_CLR_SEXT_INT(_R1, _R2)
 #define RVMODEL_SET_SSW_INT(_R1, _R2)
 #define RVMODEL_CLR_SSW_INT(_R1, _R2)
+
+/* Override LA to avoid 0x0000 rvc alignment padding at rvmodel_boot */
+#undef LA
+#define LA(reg, val)              \
+  .ifnc(reg, X0)                 ;\
+    .option push                 ;\
+    .option norvc                ;\
+    la reg, val                  ;\
+    .option pop                  ;\
+  .endif
 
 #endif /* _RVMODEL_MACROS_H */
