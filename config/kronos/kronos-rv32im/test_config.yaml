@@ -1,7 +1,7 @@
 name: kronos-rv32im
 compiler_exe: riscv64-unknown-elf-gcc
 objdump_exe: riscv64-unknown-elf-objdump
-ref_model_exe: sail_riscv_sim
+ref_model_exe: sail_riscv_sim_timeout
 udb_config: kronos-rv32im.yaml
 linker_script: link.ld
 dut_include_dir: .
