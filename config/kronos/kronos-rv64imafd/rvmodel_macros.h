@@ -5,11 +5,13 @@
 
 #define RVMODEL_DATA_SECTION
 
-/* Install a trap handler that skips illegal instructions (mepc += 4, mret).
- * This is required because ACT4 tests use .align directives that fill padding
- * with zeros (decoded as illegal instructions). Reference simulators (Spike,
- * Sail) have a built-in skip handler; we must provide one in RVMODEL_BOOT.
- * Use .option arch +zicsr so CSR instructions assemble even with -march=rv64i. */
+/* Install a trap handler that skips the faulting instruction and returns.
+ * Required because ACT4 tests use .align directives that fill padding with
+ * zeros (decoded as illegal instructions). The padding may be 2 or 4 bytes
+ * depending on surrounding instructions, so the handler inspects bits[1:0]
+ * of the faulting instruction to pick +2 (compressed) or +4 (32-bit).
+ * t1 is saved via mscratch so the test's register state is not disturbed.
+ * .option arch +zicsr enables CSR ops with -march=rv64i. */
 #define RVMODEL_BOOT                                                         \
   .option push                                                              ;\
   .option norvc                                                             ;\
@@ -18,9 +20,19 @@
   csrw    mtvec, t0                                                         ;\
   j       _kronos_boot_done                                                 ;\
 _kronos_trap_handler:                                                        \
+  csrw    mscratch, t1                                                      ;\
   csrr    t0, mepc                                                          ;\
+  lhu     t1, 0(t0)                                                         ;\
+  andi    t1, t1, 3                                                         ;\
+  addi    t1, t1, -3                                                        ;\
+  beqz    t1, 1f                                                            ;\
+  addi    t0, t0, 2                                                         ;\
+  j       2f                                                                ;\
+1:                                                                          \
   addi    t0, t0, 4                                                         ;\
+2:                                                                          \
   csrw    mepc, t0                                                          ;\
+  csrr    t1, mscratch                                                      ;\
   mret                                                                      ;\
 _kronos_boot_done:                                                           \
   .option pop                                                               ;
