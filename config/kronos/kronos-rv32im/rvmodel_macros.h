@@ -5,7 +5,38 @@
 
 #define RVMODEL_DATA_SECTION
 
-#define RVMODEL_BOOT
+/* Install a trap handler that skips the faulting instruction and returns.
+ * Required because ACT4 tests embed zero-padding in .text (from .align
+ * directives and spaces between far-branch subtests) which decode as
+ * illegal 0x00000000. Without a handler, mtvec=0 sends PC to the entry
+ * point and the test loops forever. The handler inspects bits[1:0] of
+ * the faulting instruction to pick +2 (compressed) or +4 (32-bit).
+ * t1 is saved via mscratch so the test's register state is not disturbed.
+ * .option arch +zicsr enables CSR ops with -march=rv32im. */
+#define RVMODEL_BOOT                                                         \
+  .option push                                                              ;\
+  .option norvc                                                             ;\
+  .option arch, +zicsr                                                      ;\
+  la      t0, _kronos_trap_handler                                          ;\
+  csrw    mtvec, t0                                                         ;\
+  j       _kronos_boot_done                                                 ;\
+_kronos_trap_handler:                                                        \
+  csrw    mscratch, t1                                                      ;\
+  csrr    t0, mepc                                                          ;\
+  lhu     t1, 0(t0)                                                         ;\
+  andi    t1, t1, 3                                                         ;\
+  addi    t1, t1, -3                                                        ;\
+  beqz    t1, 1f                                                            ;\
+  addi    t0, t0, 2                                                         ;\
+  j       2f                                                                ;\
+1:                                                                          \
+  addi    t0, t0, 4                                                         ;\
+2:                                                                          \
+  csrw    mepc, t0                                                          ;\
+  csrr    t1, mscratch                                                      ;\
+  mret                                                                      ;\
+_kronos_boot_done:                                                           \
+  .option pop                                                               ;
 #define RVMODEL_HALT_PASS             \
   li t0, 0x40000000               ;  \
   sw x0, 0(t0)                    ;  \
