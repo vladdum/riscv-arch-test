@@ -23,11 +23,28 @@
 
 ##### STARTUP #####
 
-# Perform boot operations. Can be empty or left undefined unless needed for
-# DUT-specific behavior such as turning on a memory controller or
-# initializing custom state.
+# Perform boot operations.
+# Install a minimal M-mode trap handler that skips 2-byte (compressed)
+# illegal instructions before the test framework sets up its own handler.
+# This is necessary because the LA macro's .option rvc / .align 5 alignment
+# padding can generate 0x0000 (c.illegal) bytes at the start of rvmodel_boot,
+# and the default mtvec=0 would otherwise cause an infinite trap loop.
 #undef RVMODEL_BOOT
-//#define RVMODEL_BOOT
+#define RVMODEL_BOOT                               \
+  .option push                                    ;\
+  .option norvc                                   ;\
+  .option arch, +zicsr                            ;\
+  la   t0, _sail_illinsn_handler                  ;\
+  csrw mtvec, t0                                  ;\
+  j    _sail_boot_done                            ;\
+  .balign 4                                       ;\
+  _sail_illinsn_handler:                          ;\
+    csrr t0, mepc                                 ;\
+    addi t0, t0, 2                                ;\
+    csrw mepc, t0                                 ;\
+    mret                                          ;\
+  _sail_boot_done:                                ;\
+  .option pop                                     ;
 
 ##### TERMINATION #####
 
