@@ -13,3 +13,8 @@ Zicntr
 Sm
 S
 U
+Sv39
+Sv48
+Svadu
+Svade
+Svbare
